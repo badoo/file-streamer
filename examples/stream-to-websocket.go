@@ -8,9 +8,11 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"github.com/badoo/file-streamer"
 	"github.com/gorilla/websocket"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -18,6 +20,41 @@ import (
 	"strconv"
 	"time"
 )
+
+// webSocketWriter is a wrapper for gorilla WebSocket connection with io.Writer interface implementation.
+//
+// it allows you use WebSocket connection as a regular io.Writer to send to client text or binary messages.
+type webSocketWriter struct {
+	io.Writer
+
+	msgType int
+	conn    *websocket.Conn
+}
+
+// Write just implements io.Writer interface.
+//
+// Any data provided to Write() will be sent to client through provided WebSocket connection with message type provided
+// at writer initialization.
+func (ws *webSocketWriter) Write(p []byte) (n int, err error) {
+	err = ws.conn.WriteMessage(ws.msgType, p)
+	return len(p), err
+}
+
+// newBuffWSWriter is a simple wrapper for creating a buffered writer for WebSocket connection.
+//
+// All data written to this writer will be sent to client in message(s) of given type.
+func newBuffWSWriter(conn *websocket.Conn, msgType int) *bufio.Writer {
+	if msgType == 0 {
+		msgType = websocket.BinaryMessage
+	}
+
+	return bufio.NewWriter(
+		&webSocketWriter{
+			conn:    conn,
+			msgType: msgType,
+		},
+	)
+}
 
 type wsStreamHandler struct {
 	http.Handler
@@ -135,7 +172,7 @@ func (h *wsStreamHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	go readWebSocketInput(conn)
 
-	listener := file_streamer.NewListener(file, file_streamer.NewBuffWSWriter(conn, websocket.TextMessage))
+	listener := file_streamer.NewListener(file, newBuffWSWriter(conn, websocket.TextMessage))
 	// Stream file data to WebSocket client
 	// Since gorilla WebSockets implementation does not support concurrent writes,
 	// keep in mind you shouldn't write to WebSocket connection while Streamer is attached to it.
