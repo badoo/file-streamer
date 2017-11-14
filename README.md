@@ -1,6 +1,8 @@
 # FileStreamer
 Streams given file data into any buffered writer. Uses fsNotify for new data detection in files.
 
+The most fresh documentation can be found on [GoDoc](https://godoc.org/github.com/badoo/file-streamer)
+
 # Concepts
 
 The library consists of 2 main instances:
