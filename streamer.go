@@ -321,31 +321,20 @@ func (s *Streamer) StreamTo(listener *Listener, timeout time.Duration) error {
 
 			listener.file.Seek(0, 1) // re-set current position to be able to read to EOF again
 
-			for {
-				n, err := listener.file.Read(buf)
-				if err == io.EOF {
-					break
-				}
+			_, err := io.CopyBuffer(listener.writeDataTo, listener.file, buf)
 
-				if err != nil {
-					fmt.Fprintf(listener.writeDataTo, "Could not read file: %s", err.Error())
-					_ = listener.writeDataTo.Flush()
+			if err != nil {
+				fmt.Fprintf(listener.writeDataTo, "Could not stream file data: %s", err.Error())
+				_ = listener.writeDataTo.Flush()
 
-					s.logger.Printf("File '%s' read error: %v", listener.file.Name(), err)
-					return err
-				}
-
-				_, err = listener.writeDataTo.Write(buf[:n])
-				if err != nil {
-					s.logger.Printf("Failed to send file '%s' contents to client: %v", listener.file.Name(), err)
-					return err
-				}
+				s.logger.Printf("File '%s' stream error: %s", listener.file.Name(), err.Error())
+				return err
 			}
 
 			// Force all data to be sent to client
-			err := listener.writeDataTo.Flush()
+			err = listener.writeDataTo.Flush()
 			if err != nil {
-				s.logger.Printf("Failed to send file '%s' contents to client: %v", listener.file.Name(), err)
+				s.logger.Printf("File '%s' stream error: %s", listener.file.Name(), err.Error())
 				return err
 			}
 
