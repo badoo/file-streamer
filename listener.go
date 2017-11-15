@@ -26,18 +26,30 @@ type Listener struct {
 
 // NewListener creates initialized Listener ready to be provided to Streamer.StreamTo() function
 func NewListener(file *os.File, writeDataTo *bufio.Writer) *Listener {
-	return &Listener{
+	l := &Listener{
 		file:        file,
 		writeDataTo: writeDataTo,
 
 		newDataNotifications: make(newDataChan, 100),
 		isClosed:             false,
 	}
+
+	// Force initial read.
+	// This hack makes sure streamer will send contents of file to buffer even when nobody changes the watched file.
+	l.newDataNotifications <- newDataEvent{}
+	return l
 }
 
 // Close prevents Streamer to stream any more data to this listener.
 //
-// Listeners are not reusable. After streaming was stopped (listener was closed), you can't use listener again for another streaming.
+// Listeners are not reusable. Reuse of closed listener will cause streamer to stop streaming immediately.
+// There is one exception for it. The code:
+//
+//   l := NewListener(...)
+//   l.Close()
+//   streamer.StreamTo(l, <any timeout>)
+//
+// will cause streamer to read data from file exactly once. It implements 'cat' utility -like behaviour
 func (bs *Listener) Close() {
 	bs.mu.Lock()
 

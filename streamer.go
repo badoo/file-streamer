@@ -59,9 +59,6 @@ var (
 
 	// ErrRunning is an error returned when action can't be finished because Streamer service is in running state
 	ErrRunning = errors.New("streamer is running")
-
-	// ErrListenerClosed is an error returned when Listener can't be used for streaming because it is already closed.
-	ErrListenerClosed = errors.New("listener is closed")
 )
 
 // New creates new instance of file streamer. Usually, you don't need more than one instance of Streamer.
@@ -131,11 +128,6 @@ func (s *Streamer) subscribeListener(listener *Listener) {
 	// subscribe
 	s.logger.Printf("New listener for '%s' file", listener.file.Name())
 	s.subscriptions[listener.file.Name()][listener.newDataNotifications] = empty{}
-
-	// force initial file read after subscription
-	if len(listener.newDataNotifications) < cap(listener.newDataNotifications) {
-		listener.newDataNotifications <- newDataEvent{}
-	}
 }
 
 // unsubscribeListener removes listener's 'new data' notification channel from subscriptions list.
@@ -299,10 +291,6 @@ func (s *Streamer) IsRunning() bool {
 func (s *Streamer) StreamTo(listener *Listener, timeout time.Duration) error {
 	if !s.IsRunning() {
 		return ErrNotRunning
-	}
-
-	if listener.IsClosed() {
-		return ErrListenerClosed
 	}
 
 	s.subscribe <- listener
